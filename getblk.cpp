@@ -7,7 +7,7 @@ class Buffer{
 		public:
 		int num;
 		int status;		//0-free,1-locked,-1-delayed write
-
+		int status2;		//0-invaild data, 1-vaild data
 		Buffer *next;
 		Buffer *prev;
 		Buffer *nextfree;
@@ -24,50 +24,61 @@ class Buffer{
 		}		
 	   };
 
-Buffer *createhash0()
-{
-	Buffer *End;
-	End=NULL;
-	cout<<"world ";
-	for(int i=0;i<total_buffer/4;i++)
+
+int main()
+{	
+	// Creating hash table
+	Buffer *HashHead[4],*HashEnd[4];
+	for(int i=0;i<4;i++)
+	{
+		HashEnd[i]=NULL;
+		HashHead[i]=NULL;
+	}
+	for(int i=0;i<total_buffer;i++)
 	{
 		Buffer *temp=(Buffer *)malloc(sizeof(Buffer));
-		temp->num=i*total_buffer/4;
-		if(End==NULL)
+		int hashnum=i%4;
+		temp->num=i;
+		if(HashHead[hashnum]==NULL)
 		{
-			End=temp;
+			HashEnd[hashnum]=temp;
+			HashHead[hashnum]=temp;
 		}
 		else
 		{
-			temp->next=End->next;
-			End->next=temp;
-			End=temp;
+			temp->prev=HashEnd[hashnum];
+			HashEnd[hashnum]->next=temp;
+			HashEnd[hashnum]=temp;
 		}
 	}
-	return End;
-}
-
-
-int main()
-{
-	cout<<"you ";
-	Buffer *End0=NULL;
-	End0=createhash0();
+	
 	Buffer *temp=(Buffer *)malloc(sizeof(Buffer));
-	temp=End0;
+	temp=HashEnd[0];
 	while(temp!=NULL)
 	{
 		cout<<temp->num<<endl;	
-		temp=temp->next;
+		temp=temp->prev;
+	}
+
+	temp=HashEnd[1];
+	while(temp!=NULL)
+	{
+		cout<<temp->num<<endl;	
+		temp=temp->prev;
+	}
+
+	temp=HashEnd[2];
+	while(temp!=NULL)
+	{
+		cout<<temp->num<<endl;	
+		temp=temp->prev;
+	}
+
+	temp=HashEnd[3];
+	while(temp!=NULL)
+	{
+		cout<<temp->num<<endl;	
+		temp=temp->prev;
 	}
 	return 1;
 }
-
-/*
-int main()
-{
-	cout<<"you ";
-	Buffer End0;
-	Buffer *End1=NULL;
-	return 1;
-}*/
