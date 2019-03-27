@@ -1,8 +1,21 @@
 #include<iostream>
+#include<thread>
+#include<unistd.h>
+#include<map>
+#include<condition_variable>
+#include<random>
+
+#define total_block 50
 #define total_buffer 20 
 #define num_hash 4
+#define total_thread 1
 
 using namespace std;
+
+condition_variable cv;
+map <int , thread::id> Lock_table;
+map <thread::id , int> req_table;
+thread::id tid;
 
 class Buffer{
 		
@@ -29,7 +42,7 @@ class Buffer{
 		{
 			num=nu;
 			status=s1;
-			status2=s2;
+			valid=s2;
 			next=n;
 			prev=p;
 			nextfree=nf;
@@ -41,24 +54,27 @@ class Buffer{
 			num=n;
 		}	
 
-		void setstatus(int s1,int s2)
+		void setstatus(int s)
 		{
-			status=s1;
-			status=s2;
+			status=s;
+		}
+		void setvalid(int v)
+		{
+			valid=v;
 		}
 		int getnum()
 		{
 			return num;
 		}
 	
-		int getstatus1()
+		int getstatus()
 		{
 			return status;
 		}
 		
-		int getstatus2()
+		int getvalid()
 		{
-			return status;
+			return valid;
 		}
 	};
 
@@ -101,6 +117,25 @@ Buffer *insert_in_free(Buffer *free,Buffer *node)
 	return free;
 }
 
+Buffer *insert_in_free_begin(Buffer *free,Buffer *node)
+{
+	if(free==NULL)
+	{
+		free=node;
+		node->nextfree=node;
+		node->prevfree=node;
+	}
+	else
+	{
+		Buffer *temp;
+		temp=free->nextfree;
+		node->prevfree=temp;
+		node->nextfree=temp->nextfree;
+		temp->nextfree=node;
+		node->nextfree->prevfree=node;
+	}
+	return free;
+}
 
 void remove_from_hash(Buffer *Hashque[],int newblock,Buffer *node)
 {
@@ -121,11 +156,11 @@ void remove_from_hash(Buffer *Hashque[],int newblock,Buffer *node)
 	Hashque[newblock%num_hash]=insert_in_Hash(Hashque[newblock%num_hash], node);
 }
 
-Buffer *remove_from_free(Buffer *free,Buffer *node)
+void remove_from_free(Buffer *free,Buffer *node)
 {	
 	if(free==NULL)
 	{
-		return free;
+		return;
 	}
 	if(free==node);
 	{
@@ -148,7 +183,6 @@ Buffer *remove_from_free(Buffer *free,Buffer *node)
 	temp->nextfree->prevfree=temp->prevfree;
 	temp->nextfree=NULL;
 	temp->prevfree=NULL;
-	return free;
 }
 
 
@@ -182,12 +216,58 @@ Buffer *getblk(Buffer *Hash[],Buffer *free,int Blocknum)
 	reqBuf=NULL;
 	while(reqBuf==NULL)
 	{
-		temp=search(Hash,Blcoknum);
+		temp=search(Hash,Blocknum);
 		if(temp!=NULL)
 		{
-			if(temp->getstatus1()
-	
+			if(temp->getstatus()==1)
+			{
+				//sleep
+				continue;
+			}
+			temp->setstatus(1);
+			remove_from_free(free,temp);
+			return temp;
+		}
+		else
+		{
+			if(free==NULL)
+			{
+				//sleep
+				continue;
+			}
+			temp=free->nextfree;
+			remove_from_free(free,temp);
+			if(temp->getstatus()==-1)
+			{
+				//sleep
+				temp->setstatus(0);
+				continue;
+			}
+			remove_from_hash(Hash,Blocknum,temp);
+			return temp;
+		}
+	}
 }
+
+Buffer *brlse(Buffer *free,Buffer *node)
+{
+	//wakeup
+	//raise execution level
+	int release=0;
+	if(node->getvalid()==1)		// and not old
+	{
+		free=insert_in_free(free,node);
+	}
+	else
+	{	
+		release=-1;
+		free=insert_in_free_begin(free,node);
+	}
+	//lower execution
+	node->setstatus(release);
+}
+
+
 
 void DisplayBuf(Buffer *Hash[],Buffer *free)
 {
@@ -214,10 +294,29 @@ void DisplayBuf(Buffer *Hash[],Buffer *free)
 	cout<<temp->getnum()<<endl;
 }
 
+void child()
+{
+	for(int i=0;i<10;i++)
+	{
+		int ran=rand()%total_block;
+		//request buffer
+		req_table[this_thread::get_id()]=ran;
+		tid=this_thread::get_id();
+		cout<<"request"<<" "<<Lock_table[ran]<<endl;
+		while(Lock_table[ran]!=this_thread::get_id())
+			sleep(0.1);
+
+		//sleep((rand()%10)*0.1);	//working
+
+		
+	}
+}
+
 int main()
 {	
 	// Creating hash table and Free list
 	Buffer *Hash[num_hash],*free;
+	
 	for(int i=0;i<num_hash;i++)
 	{
 		Hash[i]=NULL;
@@ -230,13 +329,56 @@ int main()
 		temp=new Buffer(i);
 		Hash[hashnum]=insert_in_Hash(Hash[hashnum],temp);
 		free=insert_in_free(free,temp);
+		Lock_table.insert(pair<int,thread::id>(temp->getnum(),0));
 	}
 
-	remove_from_hash(Hash,23,search(Hash,12));
-		
-	free=remove_from_free(free,search(Hash,14));
+	thread t[total_thread];
+	for( int i=0;i<total_thread;i++)
+	{
+		cout<<"t"<<i<<" ";
+		req_table.insert(pair<thread::id,int>(t[i].get_id(),0));
+		t[i]=thread(child);
+	}
+	sleep(0.1);
+	int f=0;
+	for(;;)
+	{
+		for( int i=0;i<total_thread;i++)
+		{
+			if(req_table[tid]!=0)
+			{
+				Lock_table[req_table[tid]]=tid;
+				cout<<"getblock";
+				f=1;
+			}
+		}
+		if(f==1)
+			break;
+	}
+	
+	Buffer *temp1,*temp2,*temp3;
 
+	temp1=getblk(Hash,free,23);
+	
 	DisplayBuf(Hash,free);
 
+	
+	temp2=getblk(Hash,free,12);
+	
+	DisplayBuf(Hash,free);
+
+	brlse(free,temp1);	
+
+	temp3=getblk(Hash,free,24);
+	
+	DisplayBuf(Hash,free);
+
+	brlse(free,temp2);
+	brlse(free,temp3);
+	
+	DisplayBuf(Hash,free);
+
+	t[0].join();	
+	
 	return 1;
 }
