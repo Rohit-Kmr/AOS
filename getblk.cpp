@@ -8,7 +8,7 @@
 #include"Buffer.h"
 
 #define total_block 50
-#define total_buffer 2
+#define total_buffer 16
 #define num_hash 4
 #define total_thread 4
 
@@ -21,7 +21,7 @@ mutex respm,iom;			//iom used for sync
 mutex free_m,hash_m;			// rest of mutex is used for condition variable
 map <int , int> req_table;
 map <int , int> Lock_table;
-int req_thread=-1,req_t=-1,response=-1;
+int req_thread=-1,rlse=-1,req_t=-1,response=-1;
 int free_NULL=1; 
 
 Buffer *response_b=NULL,*requ_b=NULL;
@@ -90,6 +90,19 @@ void child(int process_num)
 
 		{
 			unique_lock<mutex> childl(childm);
+			{
+				char op;
+				sleep(0.5);
+				unique_lock<mutex> iol(iom);
+				cout<<process_num<<" Performed a write(y/n) :";
+				cin>>op;
+				iol.unlock();
+				if(op=='y')
+					rlse=0;
+				else
+					rlse=1;
+					
+			}		
 			req_t=1;
 			req_thread=process_num;
 			requ_b=temp;
@@ -168,7 +181,8 @@ int main()
 				cout<<req_thread<<" is releasing buffer: "<<requ_b->getnum()<<endl;
 				iol.unlock();			
 			}	
-			free=brlse(free,requ_b,Lock_table);
+			free=brlse(free,requ_b,Lock_table,rlse);
+			rlse=-1;
 			free_NULL=0;
 			p_status[req_thread]=-1;
 			free_cv.notify_all();
