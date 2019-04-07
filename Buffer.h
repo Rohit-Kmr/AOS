@@ -375,7 +375,7 @@ Buffer *getblk(Buffer *Hash[],Buffer* &free,int Blocknum,map <int , int> &Lock_t
 			remove_from_hash(Hash,Blocknum,temp);		//2nd
 			temp->setstatus(1);
 			Lock_table[temp->getnum()]=1;
-			temp->setvalid(0);
+			temp->setvalid(1);				//asuming it reads content
 			return temp;
 		}
 	}
@@ -399,7 +399,7 @@ Buffer *brlse(Buffer* &free,Buffer *node,map <int , int> &Lock_table)
 	int sta;
 	if(not_old==1)		// and not old
 	{
-		sta=0;					// free or delayed write
+		sta=1;					// free or delayed write
 		free=insert_in_free(free,node);
 	}
 	else
