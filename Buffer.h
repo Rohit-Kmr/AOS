@@ -381,7 +381,7 @@ Buffer *getblk(Buffer *Hash[],Buffer* &free,int Blocknum,map <int , int> &Lock_t
 	}
 }
 
-Buffer *brlse(Buffer* &free,Buffer *node,map <int , int> &Lock_table)
+Buffer *brlse(Buffer* &free,Buffer *node,map <int , int> &Lock_table,int not_old)
 {
 /*
 	Description: releases a locked buffer
@@ -395,11 +395,10 @@ Buffer *brlse(Buffer* &free,Buffer *node,map <int , int> &Lock_table)
 */
 	//wakeup
 	//raise execution level
-	int not_old=rand()%2;
 	int sta;
 	if(not_old==1)		// and not old
 	{
-		sta=1;					// free or delayed write
+		sta=0;					// free or delayed write
 		free=insert_in_free(free,node);
 	}
 	else
